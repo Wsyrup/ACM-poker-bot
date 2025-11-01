@@ -12,6 +12,7 @@ To ensure smooth gameplay and fair evaluation, all teams must follow the submiss
 - Illegal moves will be automatically treated as folding. For example, checking when a raise is required or betting less than the required minimum.
 - Your bot will have a runtime limit of 5s each time it's run.
 - Additional helper functions/classes are allowed as long as they don’t interfere with the interface.
+- In your final submission, please ensure that you do NOT include any **print statements** as these interfere with the bot's output.
 
 
 ## Submission Rules
@@ -95,4 +96,4 @@ Interpreting the example:
 ## Contact & Support
 For technical issues or clarifications
 - Join our [Discord server](https://discord.gg/p6rcUUjWaU)
-- Or email us at: acm.dev.ucsb@gmail.com
+- Or email us at: [acm.dev.ucsb@gmail.com](mailto:acm.dev.ucsb@gmail.com)
