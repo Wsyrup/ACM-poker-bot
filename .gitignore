@@ -1,0 +1,81 @@
+# === Python ===
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+*.pdb
+*.egg-info/
+.eggs/
+dist/
+build/
+.python-version
+venv/
+.env/
+.envrc
+*.env
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# pytest
+.cache/
+
+# === C++/CMake ===
+/build/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+*.o
+*.obj
+*.so
+*.dylib
+*.dll
+*.exe
+*.out
+*.a
+*.lib
+*.pch
+*.pdb
+*.mod
+*.exp
+*.app
+*.dSYM/
+
+# === OS/Editor ===
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.swn
+*.bak
+*.tmp
+*.log
+.idea/
+.vscode/
+*.code-workspace
+
+# === Package Artifacts ===
+*.whl
+*.egg
+
+# === Misc ===
+# Local test, coverage, and profiling
+htmlcov/
+.tox/
+.mypy_cache/
+.pytest_cache/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# === Custom project folders ===
+cpp/
+python_package/
