@@ -46,3 +46,22 @@ class Memory:
 def bet(state: GameState, memory: Memory | None=None) -> tuple[int, Memory | None]:
     bet_amount = 0
     return (bet_amount, memory)
+
+#bet strategy:
+'''
+1. calculate hand equity
+2. based on equity and pot odds, decide on preflop action
+3. then, use existing equity + classification model of opponents to determine postflop actions
+4. adjust bet based on risk analysis and opponent classification.
+5. implement bluffing strategy based on game dynamics and opponent tendencies.
+    e.g., bluff against "tight" players, call "aggressive" players, etc...
+6. continuously update opponent models based on observed behavior (throughout the game).
+
+
+7. refine betting strategy using reinforcement learning techniques over multiple games 
+(train analysis biases throughout weekend)?
+linear regression / predictive model based on hands, types of opponents in pot
+use that to adjust bet sizing and bluff frequency. 
+
+    
+'''
