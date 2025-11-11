@@ -11,6 +11,7 @@ dist/
 build/
 .python-version
 venv/
+.venv/
 .env/
 .envrc
 *.env

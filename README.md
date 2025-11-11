@@ -65,6 +65,81 @@ Interpreting the example:
 - You have triples with 2 spade (`2s`), 2 hearts (`2h`), and 2 diamonds (`2d`).
 
 
+## Development Setup
+
+This project includes a **polyglot build system** supporting both Python and C++ (via pybind11) for performance-critical components like hand equity calculation.
+
+### Initial Setup
+
+Run the setup script to initialize the virtualenv, install dependencies, and build the C++ extension:
+
+```bash
+./setup.sh
+```
+
+Or specify a Python version:
+```bash
+./setup.sh 3.11.4
+```
+
+This script will:
+1. Install pyenv and pyenv-virtualenv (if needed)
+2. Install the specified Python version
+3. Create a virtual environment named `poker-cactus-<version>`
+4. Install Python dependencies (pybind11, setuptools, wheel)
+5. Build the C++ extension module via CMake
+6. Write `.python-version` to auto-activate the virtualenv
+
+### Activating the Virtual Environment
+
+After setup, the virtualenv will be automatically activated when you enter the project directory (thanks to `.python-version`). To manually activate:
+
+```bash
+# If you're using bash/zsh with pyenv already initialized:
+pyenv activate poker-cactus-3.11.4
+
+# Or, if pyenv is not in your shell:
+eval "$(pyenv init --path)" && eval "$(pyenv virtualenv-init -)" && pyenv activate poker-cactus-3.11.4
+```
+
+### Building the C++ Extension
+
+If you need to rebuild the C++ module after modifying `cpp/module.cpp`:
+
+```bash
+cd build
+cmake -S ../cpp -B . -DCMAKE_BUILD_TYPE=Release -DPython3_EXECUTABLE=$(which python)
+cmake --build . --config Release
+cd ..
+```
+
+**Note:** The build requires the virtualenv's Python interpreter. Make sure you've activated the virtualenv before building, otherwise CMake may use the system Python and fail to find pybind11.
+
+### Troubleshooting: "Could not find pybind11"
+
+If CMake cannot find pybind11 despite it being installed:
+
+1. **Ensure pybind11 is installed in the active virtualenv:**
+   ```bash
+   pip list | grep pybind11
+   ```
+   If missing:
+   ```bash
+   pip install pybind11
+   ```
+
+2. **Use the correct Python interpreter in CMake:**
+   ```bash
+   which python  # Get the path to the active Python
+   cmake -S ../cpp -B build -DPython3_EXECUTABLE=<path from above>
+   ```
+
+3. **Clear CMake cache and try again:**
+   ```bash
+   rm -rf build/CMakeCache.txt build/CMakeFiles
+   cmake -S ../cpp -B build -DCMAKE_BUILD_TYPE=Release -DPython3_EXECUTABLE=$(which python)
+   ```
+
 ## Code Specification & Libraries
 - Only Python 3.11 is allowed.
 - We only allow some standard Python libraries and numpy
