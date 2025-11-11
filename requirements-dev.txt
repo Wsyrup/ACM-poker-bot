@@ -1,0 +1,26 @@
+# requirements-dev.txt
+# Development and build dependencies for C++/pybind11 + Python 3.12 workflow
+# Precise pins chosen for stability with Python 3.12 (can be relaxed if desired).
+
+# pybind11 (C++ <-> Python bindings)
+pybind11==3.0.1
+
+# CMake (used to configure & build the C++ extension)
+# Note: the pip 'cmake' package supplies a recent CMake binary when system cmake is old/missing.
+cmake==3.31.1
+
+# Tools to speed up native builds (optional but recommended)
+ninja==1.13.0
+
+# Packaging / build tools
+setuptools==80.9.0
+wheel==0.45.1
+
+# Optional testing & dev tooling (useful for unit tests / CI)
+pytest==8.4.0
+pytest-xdist==3.2.0
+
+# Lint / format / type-check (optional, helpful during development)
+black==24.10.0
+mypy==1.4.1
+isort==6.1.0
