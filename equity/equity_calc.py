@@ -40,9 +40,6 @@ def estimate_equity_5cards(my_hand, opponent_hands, num_simulations=10000):
         for opp_hand in opponent_hands:
             if len(opp_hand) == 5:
                 opp_rank = evaluate_hand(opp_hand)
-            else:
-                # Handle 7-card hands
-                opp_rank = evaluate_best_hand(opp_hand)
             best_opponent_rank = min(best_opponent_rank, opp_rank)
         
         if my_rank < best_opponent_rank:

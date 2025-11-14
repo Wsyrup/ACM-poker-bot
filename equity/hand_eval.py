@@ -18,6 +18,9 @@ References:
 """
 
 # === Card Rank/Suit Constants ===
+from enum import Enum
+
+
 DEUCE = 0
 THREE = 1
 FOUR = 2
@@ -48,6 +51,24 @@ SUIT_MAP = {'s': SPADE, 'h': HEART, 'd': DIAMOND, 'c': CLUB}
 
 RANK_STR = ['2', '3', '4', '5', '6', '7', '8', '9', 't', 'j', 'q', 'k', 'a']
 SUIT_STR = ['s', 'h', 'd', 'c']
+
+# Preflop hand bins for easy preflop calculations
+# BW - broadway. Elements of the highest straight
+
+class preflop_bins(Enum):
+    PremiumPair = 1 #AA, KK
+    HighPair = 2 #QQ, JJ, TT
+    MidPair = 3 #99, 88
+    NutBWSuited = 4 #AKs, AQs, AJs, KQs
+    BWSuited = 5 #ATs, KJs, Qjs, JTs, T9s
+    BWOffsuit = 6 #AKo, AQo, AJo, KQo, JTo
+    SuitedAceHigh = 7 #Axs (Ax suited, x=6-9)
+    SmallPair = 8 #77-22
+    SuitedAceLow = 9 #A2s-A5s
+    SuitedConnectors = 10 #98s, 87s, 76s, 65s, 54s
+    SuitedGappers = 11 #97s, 86s, 75s, 64s, 53s, 43s
+    OneHighSuited = 12 #Kxs, Qxs, Jxs (x=2-9)
+    TrashOffsuit = 13 #All other offsuit hands
 
 
 def string_to_card(card_str: str) -> int:
@@ -329,6 +350,87 @@ def evaluate_best_hand(cards: list) -> int:
     """
     return _evaluator.evaluate_7cards(cards)
 
+def bin_preflop_hand(cards: list) -> int:
+    """
+    Bin preflop hand into categories based on rank and suitedness.
+    
+    Args:
+        cards: List of 2 cards (can be strings or integers)
+
+    Returns:
+        Integer bin index representing hand category
+    """
+    if not isinstance(cards, list) or len(cards) != 2:
+        raise ValueError("cards must be a list of exactly 2 cards")
+
+    # Convert to integer card encoding if needed
+    c0 = string_to_card(cards[0]) if isinstance(cards[0], str) else cards[0]
+    c1 = string_to_card(cards[1]) if isinstance(cards[1], str) else cards[1]
+
+    r0 = c0 & 0xF
+    r1 = c1 & 0xF
+    s0 = (c0 >> 4) & 0x3
+    s1 = (c1 >> 4) & 0x3
+
+    # Normalize ordering: high_rank is the higher card rank
+    high = max(r0, r1)
+    low = min(r0, r1)
+    suited = (s0 == s1)
+
+    # Pair categories
+    if high == low:
+        if high in (ACE, KING):
+            return preflop_bins.PremiumPair
+        if high in (QUEEN, JACK, TEN):
+            return preflop_bins.HighPair
+        if high in (NINE, EIGHT):
+            return preflop_bins.MidPair
+        return preflop_bins.SmallPair
+
+    # Helper to check unordered rank pair
+    def ranks_are(a, b):
+        return (high == a and low == b) or (high == b and low == a)
+
+    # Suited hands
+    if suited:
+        # Nut broadway suited (AKs, AQs, AJs, KQs)
+        if ranks_are(ACE, KING) or ranks_are(ACE, QUEEN) or ranks_are(ACE, JACK) or ranks_are(KING, QUEEN):
+            return preflop_bins.NutBWSuited
+
+        # Broadways suited (ATs, KJs, QJs, JTs, T9s)
+        if ranks_are(ACE, TEN) or ranks_are(KING, JACK) or ranks_are(QUEEN, JACK) or ranks_are(JACK, TEN) or ranks_are(TEN, NINE):
+            return preflop_bins.BWSuited
+
+        # Suited ace low (A2s-A5s)
+        if high == ACE and low <= FIVE:
+            return preflop_bins.SuitedAceLow
+
+        # Suited ace high (A6s-A9s)
+        if high == ACE and FIVE < low <= NINE:
+            return preflop_bins.SuitedAceHigh
+
+        # Suited connectors (98s, 87s, 76s, 65s, 54s)
+        if abs(high - low) == 1 and low >= FOUR and high <= NINE:
+            return preflop_bins.SuitedConnectors
+
+        # Suited one-gap (97s, 86s, 75s, 64s, 53s, 43s)
+        if abs(high - low) == 2 and low >= THREE:
+            return preflop_bins.SuitedGappers
+
+        # One high suited (Kxs, Qxs, Jxs where x is low)
+        if high in (KING, QUEEN, JACK):
+            return preflop_bins.OneHighSuited
+
+        # Fallback for other suited hands
+        return preflop_bins.OneHighSuited
+
+    # Offsuit hands
+    # Broadways offsuit (AKo, AQo, AJo, KQo, JTo)
+    if ranks_are(ACE, KING) or ranks_are(ACE, QUEEN) or ranks_are(ACE, JACK) or ranks_are(KING, QUEEN) or ranks_are(JACK, TEN):
+        return preflop_bins.BWOffsuit
+
+    # Everything else offsuit is considered trash for now
+    return preflop_bins.TrashOffsuit
 
 # === Hand rank classification helpers ===
 def hand_rank_name(rank: int) -> str:
