@@ -94,6 +94,8 @@ def bet(state: GameState, memory: Memory | None=None) -> tuple[int, Memory | Non
 
         if get_preflop_position(state=state) == Preflop_Position.SB: #play if small blind in first round.
             return (state.small_blind, memory)
+        if get_preflop_position(state=state) == Preflop_Position.BB:
+            return (bb, memory)
 
         if preflop_hand > preflop_bins.OneHighSuited:
             return (fold(), memory)
@@ -106,6 +108,11 @@ def bet(state: GameState, memory: Memory | None=None) -> tuple[int, Memory | Non
         else:
             bet = (1.5 + (1.0/preflop_hand)) * min_raise(state) 
             return (bet, memory)
+
+    elif (get_round_name(state=state) == "Flop"):
+        equity = he._evaluator.evaluate_5cards(state.player_cards + state.community_cards)
+        
+        
     
     
     
