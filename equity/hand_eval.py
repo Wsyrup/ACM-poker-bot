@@ -350,7 +350,7 @@ def evaluate_best_hand(cards: list) -> int:
     """
     return _evaluator.evaluate_7cards(cards)
 
-def bin_preflop_hand(cards: list) -> int:
+def bin_preflop_hand(cards: list) -> preflop_bins:
     """
     Bin preflop hand into categories based on rank and suitedness.
     
