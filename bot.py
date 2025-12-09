@@ -237,7 +237,7 @@ def bet(state: GameState, memory: Memory | None=None) -> tuple[int, Memory | Non
     if memory is None:
         memory = Memory()
 
-    if (get_round_name == "Pre-Flop"):
+    if (get_round_name(state) == "Pre-Flop"):
         bb: int = state.big_blind
         bet: int = 0
 
