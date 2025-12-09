@@ -205,6 +205,10 @@ class Memory:
       - villain_aggro_map: player_id -> OpponentAggressionEstimator instance
       - villain_last_bet: player_id -> last observed bet_money (int)
     """
+    villain_aggro_map: dict[str, OpponentAggressionEstimator]
+    villain_last_bet: dict[str, int]
+    population_avg_aggression: float
+
     def __init__(self):
         # map player id -> OpponentAggressionEstimator
         self.villain_aggro_map: dict[str, OpponentAggressionEstimator] = {}

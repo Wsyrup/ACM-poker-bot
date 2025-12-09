@@ -67,78 +67,48 @@ Interpreting the example:
 
 ## Development Setup
 
-This project includes a **polyglot build system** supporting both Python and C++ (via pybind11) for performance-critical components like hand equity calculation.
+This project uses a pure-Python implementation for the bot and equity calculations. The recommended workflow below uses pyenv/virtualenv to create an isolated Python 3.11 environment.
 
 ### Initial Setup
 
-Run the setup script to initialize the virtualenv, install dependencies, and build the C++ extension:
+Run the setup script to initialize the virtualenv and install Python dependencies:
 
 ```bash
 ./setup.sh
 ```
 
-Or specify a Python version:
+Or specify a Python version explicitly:
+
 ```bash
 ./setup.sh 3.11.4
 ```
 
-This script will:
-1. Install pyenv and pyenv-virtualenv (if needed)
-2. Install the specified Python version
+What the script does:
+1. Install pyenv and pyenv-virtualenv (if configured in your environment)
+2. Install the specified Python version (if missing)
 3. Create a virtual environment named `poker-cactus-<version>`
-4. Install Python dependencies (pybind11, setuptools, wheel)
-5. Build the C++ extension module via CMake
-6. Write `.python-version` to auto-activate the virtualenv
+4. Install Python dependencies listed by the project
+5. Write `.python-version` to auto-activate the virtualenv (if you use pyenv)
 
 ### Activating the Virtual Environment
 
-After setup, the virtualenv will be automatically activated when you enter the project directory (thanks to `.python-version`). To manually activate:
+After setup, the virtualenv may be auto-activated when you enter the project directory (via `.python-version`). To manually activate:
 
 ```bash
 # If you're using bash/zsh with pyenv already initialized:
 pyenv activate poker-cactus-3.11.4
 
-# Or, if pyenv is not in your shell:
+# Or, initialize pyenv in-session and activate:
 eval "$(pyenv init --path)" && eval "$(pyenv virtualenv-init -)" && pyenv activate poker-cactus-3.11.4
 ```
 
-### Building the C++ Extension
-
-If you need to rebuild the C++ module after modifying `cpp/module.cpp`:
+If you don't use pyenv you can still create and activate a venv manually:
 
 ```bash
-cd build
-cmake -S ../cpp -B . -DCMAKE_BUILD_TYPE=Release -DPython3_EXECUTABLE=$(which python)
-cmake --build . --config Release
-cd ..
+python3.11 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
-
-**Note:** The build requires the virtualenv's Python interpreter. Make sure you've activated the virtualenv before building, otherwise CMake may use the system Python and fail to find pybind11.
-
-### Troubleshooting: "Could not find pybind11"
-
-If CMake cannot find pybind11 despite it being installed:
-
-1. **Ensure pybind11 is installed in the active virtualenv:**
-   ```bash
-   pip list | grep pybind11
-   ```
-   If missing:
-   ```bash
-   pip install pybind11
-   ```
-
-2. **Use the correct Python interpreter in CMake:**
-   ```bash
-   which python  # Get the path to the active Python
-   cmake -S ../cpp -B build -DPython3_EXECUTABLE=<path from above>
-   ```
-
-3. **Clear CMake cache and try again:**
-   ```bash
-   rm -rf build/CMakeCache.txt build/CMakeFiles
-   cmake -S ../cpp -B build -DCMAKE_BUILD_TYPE=Release -DPython3_EXECUTABLE=$(which python)
-   ```
 
 ## Code Specification & Libraries
 - Only Python 3.11 is allowed.
@@ -172,3 +142,73 @@ If CMake cannot find pybind11 despite it being installed:
 For technical issues or clarifications
 - Join our [Discord server](https://discord.gg/p6rcUUjWaU)
 - Or email us at: [acm.dev.ucsb@gmail.com](mailto:acm.dev.ucsb@gmail.com)
+
+## Technical specifications & implementation
+
+This project is a Python poker bot implementation optimized for correctness and speed.
+
+### Basic Decision Tree
+
+#### Pre-Flop:
+Bin pre-flop hand into one of 13 possible bins, and make a pre-flop betting decision based on the hand bin and the bot's pre-flop position. (fold, limp, call any, raise).
+
+#### Flop, Turn, River:
+Use a lightweight classifier on each villain to restrict the range of possible villain cards based on villain bets. 
+Use this to restrict the villain range in the equity calculation. 
+Calculate equity, and scale based on betting tendencies of opponents (i.e. versus loose opponents, effective equity might be higher, so call more often). 
+Make betting decision based on the calculated equity of the hand.
+
+- Runtime: Python 3.11 (pyenv / pyenv-virtualenv recommended).
+- Performance: A pure-Python implementation of Cactus Kev's hand evaluator exists in `equity/hand_eval.py`. An optimization would be to use C++ to do these heavy integer calculations.
+- Key modules:
+    - `bot.py` — primary bot interface. Implement `bet(state: GameState) -> int` to return actions.
+    - `equity/hand_eval.py` — Cactus Kev-style hand evaluator implemented in Python (fast integer-based evaluator).
+    - `equity/equity_calc.py` — unified equity calculator (Monte Carlo sampling) used by decision logic.
+    - `equity/tests/` — unit-style test scripts used to validate evaluator and equity calculations.
+
+Design notes:
+- The evaluator returns integer ranks where lower values indicate stronger hands (compatible with Cactus Kev ranking conventions).
+- `equity/estimate_equity(...)` performs Monte Carlo sampling by randomly drawing hole cards for opponents from a provided villain pool. It supports preflop, flop, turn, and river by accepting 0–5 community cards.
+- Tests are plain Python scripts (not pytest) and are executed directly; they print human-readable summaries and return non-zero exit codes on failures for CI compatibility.
+
+Files of interest (quick):
+- `bot.py` — main template and example decision code.
+- `helpers.py` — small utility helpers used by the bot.
+- `equity/hand_eval.py` — hand evaluator (pure Python implementation).
+- `equity/equity_calc.py` — equity functions (Monte Carlo and deterministic helpers).
+- `equity/tests/` — test harnesses: `test_hand_eval.py`, `test_equity_calc.py`, `test_bot_preflop.py`.
+
+## Running & testing
+
+Recommended, reproducible workflow (macOS / bash):
+
+1. Install dependencies and create the virtualenv (recommended):
+
+```bash
+./setup.sh            # uses default Python version configured in script
+# or explicitly:
+./setup.sh 3.11.4
+```
+
+2. Activate the virtualenv (if not auto-activated by pyenv):
+
+```bash
+pyenv activate poker-cactus-3.11.4
+```
+
+4. Run the tests (scripts print summaries and return non-zero on failure):
+
+```bash
+python equity/tests/test_hand_eval.py
+python equity/tests/test_equity_calc.py
+python equity/tests/test_bot_preflop.py
+```
+
+Tips:
+- Use the virtualenv Python to run tests to ensure pybind11 extension is discoverable.
+- For faster, deterministic Monte Carlo runs, seed the RNG in tests by calling `random.seed(...)` before `estimate_equity`.
+
+## Developer notes
+
+- The equity functions expect `villain_range` to be a pool of cards (a list of card strings) — the Monte Carlo sampler picks hole cards from that pool each simulation. When you want to represent a set of possible opponent hole-card pairs, provide the union of their card sets or adapt the caller to supply explicit 2-card combos.
+- Keep the public bot API (`bet(state: GameState) -> int`) stable. The tournament harness expects a single integer output for each invocation.

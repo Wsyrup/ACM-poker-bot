@@ -2,12 +2,6 @@
 # Development and build dependencies for C++/pybind11 + Python 3.12 workflow
 # Precise pins chosen for stability with Python 3.12 (can be relaxed if desired).
 
-# pybind11 (C++ <-> Python bindings)
-pybind11==3.0.1
-
-# CMake (used to configure & build the C++ extension)
-# Note: the pip 'cmake' package supplies a recent CMake binary when system cmake is old/missing.
-cmake==3.31.1
 
 # Tools to speed up native builds (optional but recommended)
 ninja==1.13.0
