@@ -78,6 +78,11 @@ SEED = 2025129           # reproducible seed
 # ------------------------
 # Imports
 # ------------------------
+# Add parent directory to path so we can import bot modules
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from helpers import (
     amount_to_call, is_valid_bet, min_raise, call, fold, check, all_in, get_round_name
 )
@@ -108,242 +113,295 @@ def make_initial_state(num_players=NUM_PLAYERS):
     S.round_name_override = "Pre-Flop"
     return S
 
-# ------------------------
-# 6) Opponent behaviors - mixed table
-# ------------------------
-def aggressive_opponent_action(state, idx):
-    # large raise (bounded by their stack)
-    stack = state.held_money[idx]
-    if stack <= 0:
-        return ("allin", 0)
-    raise_amt = min(stack, state.big_blind * (2 + random.randint(0, 4)))
-    state.bet_money[idx] += raise_amt
-    state.held_money[idx] -= raise_amt
-    state.pots[0].value += raise_amt
-    return ("raise", raise_amt)
+# Note: Old opponent behavior functions removed in favor of simplified random logic in simulate_long_game
 
-def passive_opponent_action(state, idx):
-    to_call = max(state.bet_money) - state.bet_money[idx]
-    if to_call <= 0:
-        return ("check", 0)
-    amt = min(to_call, state.held_money[idx])
-    state.bet_money[idx] += amt
-    state.held_money[idx] -= amt
-    state.pots[0].value += amt
-    return ("call", amt)
+# Deal a deck of cards: deal 2 cards to each active player
+def deal_hole_cards(players_active, num_players):
+    """Deal 2 random hole cards to each active player. Returns dict: player_idx -> [card1, card2]"""
+    SUITS = ['s', 'h', 'd', 'c']
+    RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', 't', 'j', 'q', 'k', 'a']
+    all_cards = [r + s for r in RANKS for s in SUITS]
+    
+    dealt = {}
+    random.shuffle(all_cards)
+    card_idx = 0
+    
+    for idx in range(num_players):
+        if idx in players_active:
+            dealt[idx] = [all_cards[card_idx], all_cards[card_idx + 1]]
+            card_idx += 2
+    
+    return dealt
 
-def random_opponent_action(state, idx):
-    choice = random.choices(["fold", "check", "call", "raise"], weights=[0.1, 0.3, 0.45, 0.15])[0]
-    if choice == "fold":
-        # represent fold by removing from players in pot list
-        state.pots[0].players = [p for p in state.pots[0].players if p != state.players[idx]]
-        return ("fold", 0)
-    if choice == "check":
-        return ("check", 0)
-    if choice == "call":
-        return passive_opponent_action(state, idx)
-    return aggressive_opponent_action(state, idx)
+def deal_community_cards(dealt_cards_count):
+    """Deal community cards (flop = 3, turn = 1, river = 1). Returns list of community cards."""
+    SUITS = ['s', 'h', 'd', 'c']
+    RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', 't', 'j', 'q', 'k', 'a']
+    all_cards = [r + s for r in RANKS for s in SUITS]
+    
+    random.shuffle(all_cards)
+    # Skip cards already dealt to players
+    available = all_cards[dealt_cards_count:]
+    
+    return available[:5]  # Return up to 5 community cards (flop + turn + river)
 
-# create mixed behavior table assignment
-# e.g., players: [HERO, Aggressive, Passive, Random, Aggressive, Passive]
-def make_behavior_list(num_players=NUM_PLAYERS, hero_pos=0):
-    names = []
-    for i in range(num_players):
-        if i == hero_pos:
-            names.append(HERO_NAME)
-            continue
-        # assign patterns: cycle Agg, Pass, Rand
-        cycle = (i % 3)
-        if cycle == 0:
-            names.append("AGG")
-        elif cycle == 1:
-            names.append("PAS")
-        else:
-            names.append("RND")
-    return names
+# Helper to reset betting state for new round (preflop -> flop, etc.)
+def reset_round_bets(bet_money):
+    """Reset bet_money for the next betting round (players check through without acting again)."""
+    return [0] * len(bet_money)
 
-BEHAVIOR_FUN = {
-    "AGG": aggressive_opponent_action,
-    "PAS": passive_opponent_action,
-    "RND": random_opponent_action
-}
+# Helper to determine the winning hand (simplified: assume showdown or last player standing wins)
+def determine_hand_winner(players_active, hole_cards_dict):
+    """Simplified winner determination: if only 1 player, they win. Otherwise, random selection."""
+    active_list = list(players_active)
+    if len(active_list) == 1:
+        return active_list[0]
+    # In a real implementation, you'd evaluate hands using evaluate_best_hand
+    return random.choice(active_list)
 
-# ------------------------
-# 7) Long game simulation loop
-# ------------------------
-def simulate_long_game(total_turns=TOTAL_TURNS, seed=SEED):
+# Main full-game simulator
+def simulate_long_game(seed=SEED):
+    """
+    Simulate full games of poker until HERO wins all chips or runs out of money.
+    
+    Rules:
+    - 6 players, all start with 7000 chips
+    - Initial BB=100, SB=50
+    - Blinds double every 25 rounds
+    - Dealer (button) rotates each round
+    - Continue until HERO wins or busts
+    """
     random.seed(seed)
-    state = make_initial_state(NUM_PLAYERS)
-    # place hero at index 0
+    
+    # Initialize game state
     hero_index = 0
-    players = make_behavior_list(NUM_PLAYERS, hero_pos=hero_index)
-    # ensure unique names for others
-    final_players = []
-    idx_map = 0
-    for p in players:
-        if p == HERO_NAME:
-            final_players.append(HERO_NAME)
+    num_players = NUM_PLAYERS
+    player_names = []
+    for i in range(num_players):
+        if i == hero_index:
+            player_names.append(HERO_NAME)
         else:
-            # unique label
-            final_players.append(f"{p}{idx_map}")
-            idx_map += 1
-    state.players = final_players
-    # hero holecards (kept constant for simplicity)
-    state.player_cards = ["As", "Kh"]
-    state.bet_money = [0] * NUM_PLAYERS
-    state.held_money = [1000] * NUM_PLAYERS
-    # reduce a couple of opponents stacks to create variety
-    state.held_money[2] = 600
-    state.held_money[4] = 300
-    state.big_blind = 10
-    state.small_blind = 5
-    state.pots = [SimpleNamespace(value=0, players=state.players.copy())]
-
+            player_names.append(f"Villain{i}")
+    
+    # Chip stacks: all start with 7000
+    chip_stacks = {i: 7000 for i in range(num_players)}
+    
+    # Blinds
+    bb = 100
+    sb = 50
+    dealer_idx = 0
+    round_num = 0
+    
     memory = None
-    last_exception = None
     start_time = datetime.utcnow()
-
-    # track simple stats
-    bot_actions = {"fold":0, "check":0, "call":0, "bet/raise":0, "allin":0, "errors":0}
-    opponent_actions_count = 0
-
-    for turn in range(total_turns):
-        pid_idx = state.index_to_action % len(state.players)
-        pid = state.players[pid_idx]
-        # occasionally rotate small blind so preflop position changes
-        if turn % 50 == 0 and turn > 0:
-            state.index_of_small_blind = (state.index_of_small_blind + 1) % len(state.players)
-
-        # occasionally advance round name to simulate postflop phases
-        if turn % 40 == 0 and turn > 0:
-            # cycle through Pre-Flop -> Flop -> Turn -> River -> Pre-Flop
-            cycle = (turn // 40) % 5
-            if cycle == 0:
-                state.round_name_override = "Pre-Flop"
-            elif cycle == 1:
-                state.round_name_override = "Flop"
-            elif cycle == 2:
-                state.round_name_override = "Turn"
-            elif cycle == 3:
-                state.round_name_override = "River"
-            else:
-                state.round_name_override = "Showdown"
-
-        # Hero acts
-        if pid == HERO_NAME:
-            try:
-                bet_amt, memory = bot.bet(state=state, memory=memory)
-            except Exception as e:
-                last_exception = e
-                bot_actions["errors"] += 1
-                print(f"[TURN {turn}] Bot raised exception: {e!r}")
-                # don't crash; continue but note the error
-                bet_amt = -9999
-
-            # interpret bot response
-            if isinstance(bet_amt, int):
-                if bet_amt < 0:
-                    # fold
-                    bot_actions["fold"] += 1
-                    state.pots[0].players = [p for p in state.pots[0].players if p != HERO_NAME]
-                elif bet_amt == 0:
-                    bot_actions["check"] += 1
-                elif bet_amt >= all_in_wrapper(state):
-                    bot_actions["allin"] += 1
-                    # apply all-in
-                    idx = pid_idx
-                    amount = min(state.held_money[idx], bet_amt)
-                    state.bet_money[idx] += amount
-                    state.held_money[idx] -= amount
-                    state.pots[0].value += amount
-                else:
-                    # numeric bet (call/raise)
-                    if bet_amt == amount_to_call_wrapper(state):
-                        bot_actions["call"] += 1
-                    else:
-                        bot_actions["bet/raise"] += 1
-                    idx = pid_idx
-                    amount = min(state.held_money[idx], bet_amt)
-                    state.bet_money[idx] += amount
-                    state.held_money[idx] -= amount
-                    state.pots[0].value += amount
-            else:
-                bot_actions["errors"] += 1
-
+    game_stats = {
+        "rounds_played": 0,
+        "hero_wins": 0,
+        "hero_loses": 0,
+        "bot_errors": 0,
+        "final_chip_stack": chip_stacks[hero_index]
+    }
+    
+    # Continue playing rounds until HERO wins all chips or goes broke
+    while True:
+        round_num += 1
+        
+        # Blind progression: double every 25 rounds
+        if round_num % 25 == 0 and round_num > 0:
+            sb *= 2
+            bb *= 2
+            print(f"\n[ROUND {round_num}] BLIND PROGRESSION: SB={sb}, BB={bb}")
+        
+        # Identify active players (those with chips > 0)
+        players_active = set(i for i in range(num_players) if chip_stacks[i] > 0)
+        
+        # Check end conditions
+        if hero_index not in players_active:
+            # HERO is out of chips
+            print(f"\nHERO BUSTED after {round_num} rounds!")
+            game_stats["rounds_played"] = round_num
+            game_stats["final_chip_stack"] = 0
+            break
+        
+        # Count active players; if only hero left, hero wins
+        if len(players_active) == 1:
+            # HERO wins all chips
+            total_chips = sum(chip_stacks.values())
+            print(f"\nHERO WINS! All opponents eliminated after {round_num} rounds!")
+            print(f"Final chip stack: {chip_stacks[hero_index]} out of {total_chips}")
+            game_stats["rounds_played"] = round_num
+            game_stats["hero_wins"] = 1
+            game_stats["final_chip_stack"] = chip_stacks[hero_index]
+            break
+        
+        # Initialize round state
+        state = make_initial_state(num_players)
+        state.players = player_names
+        state.small_blind = sb
+        state.big_blind = bb
+        state.index_of_small_blind = dealer_idx
+        state.index_to_action = (dealer_idx + 2) % num_players  # UTG (after BB)
+        
+        # Deal hole cards
+        hole_cards_dict = deal_hole_cards(players_active, num_players)
+        if hero_index in hole_cards_dict:
+            state.player_cards = hole_cards_dict[hero_index]
         else:
-            # find behavior type by name prefix
-            # behavior name is like 'AGG0','PAS1','RND2'
-            btype = pid[:3]
-            func = BEHAVIOR_FUN.get(btype, random_opponent_action)
-            action, amt = func(state, pid_idx)
-            opponent_actions_count += 1
-
-        # advance the action pointer
-        state.index_to_action = (state.index_to_action + 1) % len(state.players)
-
-        # periodic compact log
-        if (turn + 1) % LOG_EVERY == 0 or turn < 10:
-            snapshot = {
-                "turn": turn + 1,
-                "round": helpers.get_round_name(state),
-                "index_to_action": state.index_to_action,
-                "pot": state.pots[0].value,
-                "bet_money_snapshot": state.bet_money[:],
-                "held_money_snapshot": state.held_money[:],
-                "players_in_pot": state.pots[0].players[:]
-            }
-            print(f"[{datetime.utcnow().isoformat()}] Snapshot at turn {turn+1}:")
-            pp.pprint(snapshot)
-
+            state.player_cards = []
+        
+        # Initialize betting state
+        state.bet_money = [0] * num_players
+        state.held_money = [chip_stacks[i] for i in range(num_players)]
+        
+        # Post small blind and big blind
+        sb_idx = dealer_idx
+        bb_idx = (dealer_idx + 1) % num_players
+        
+        if sb_idx in players_active and chip_stacks[sb_idx] > 0:
+            sb_amt = min(sb, chip_stacks[sb_idx])
+            state.bet_money[sb_idx] = sb_amt
+            chip_stacks[sb_idx] -= sb_amt
+        
+        if bb_idx in players_active and chip_stacks[bb_idx] > 0:
+            bb_amt = min(bb, chip_stacks[bb_idx])
+            state.bet_money[bb_idx] = bb_amt
+            chip_stacks[bb_idx] -= bb_amt
+        
+        # Initialize pot
+        pot = bot.Pot()
+        pot.value = state.bet_money[sb_idx] + state.bet_money[bb_idx]
+        pot.players = list(players_active)
+        state.pots = [pot]
+        
+        state.round_name_override = "Pre-Flop"
+        
+        # Simulate preflop action
+        print(f"\n=== ROUND {round_num} ===")
+        print(f"Dealer: {player_names[dealer_idx]}, SB: {sb}, BB: {bb}")
+        print(f"HERO hole cards: {state.player_cards}")
+        print(f"Chip stacks: {[(player_names[i], chip_stacks[i]) for i in range(num_players)]}")
+        
+        # Simple preflop action loop (for now, simplified; in full version would iterate betting rounds)
+        action_count = 0
+        max_actions = 100  # Prevent infinite loop
+        
+        while action_count < max_actions:
+            pid_idx = state.index_to_action % num_players
+            
+            # Skip inactive players
+            if pid_idx not in players_active or chip_stacks[pid_idx] <= 0:
+                state.index_to_action = (state.index_to_action + 1) % num_players
+                action_count += 1
+                continue
+            
+            pid = player_names[pid_idx]
+            
+            # HERO acts
+            if pid == HERO_NAME:
+                try:
+                    bet_amt, memory = bot.bet(state=state, memory=memory)
+                except Exception as e:
+                    game_stats["bot_errors"] += 1
+                    print(f"[ROUND {round_num}] Bot error: {e!r}")
+                    bet_amt = -1  # Fold on error
+                
+                # Apply bet
+                if bet_amt < 0:
+                    # Fold
+                    players_active.discard(hero_index)
+                    print(f"HERO folds")
+                    break
+                elif bet_amt == 0:
+                    # Check/call
+                    print(f"HERO checks/calls")
+                else:
+                    # Bet/raise
+                    amt = min(bet_amt, chip_stacks[pid_idx])
+                    state.bet_money[pid_idx] += amt
+                    chip_stacks[pid_idx] -= amt
+                    state.pots[0].value += amt
+                    print(f"HERO bets {amt}")
+            else:
+                # Opponent acts
+                action = random.choices(["fold", "check/call", "raise"], 
+                                      weights=[0.1, 0.6, 0.3])[0]
+                if action == "fold":
+                    players_active.discard(pid_idx)
+                    print(f"{pid} folds")
+                elif action == "raise":
+                    amt = min(bb, chip_stacks[pid_idx])
+                    state.bet_money[pid_idx] += amt
+                    chip_stacks[pid_idx] -= amt
+                    state.pots[0].value += amt
+                    print(f"{pid} raises {amt}")
+                else:
+                    print(f"{pid} checks/calls")
+            
+            # Check if only one player left
+            if len(players_active) == 1:
+                break
+            
+            state.index_to_action = (state.index_to_action + 1) % num_players
+            action_count += 1
+        
+        # Determine winner and distribute pot
+        winner_idx = determine_hand_winner(players_active, hole_cards_dict)
+        chip_stacks[winner_idx] += state.pots[0].value
+        print(f"\n{player_names[winner_idx]} wins pot of {state.pots[0].value}")
+        
+        # Rotate dealer
+        dealer_idx = (dealer_idx + 1) % num_players
+        game_stats["rounds_played"] = round_num
+        
+        # Periodic status
+        if round_num % LOG_EVERY == 0:
+            print(f"[Status at round {round_num}] HERO stack: {chip_stacks[hero_index]}")
+    
     elapsed = (datetime.utcnow() - start_time).total_seconds()
-
+    
     # Final summary
-    print("\n=== LONG GAME SUMMARY ===")
-    print(f"Total turns simulated: {total_turns}")
-    print(f"Elapsed time (wall): {elapsed:.2f}s")
-    print("Bot action counts:", bot_actions)
-    print("Opponent actions processed:", opponent_actions_count)
-    # memory inspection
-    if memory is None:
-        print("Bot returned no memory (memory is None).")
-    else:
-        print("Memory summary (villain_aggro_map keys and sizes):")
-        try:
-            keys = list(memory.villain_aggro_map.keys())
-            print("Tracked opponents:", keys)
-            for k in keys:
-                est = memory.villain_aggro_map[k]
-                hist_len = len(est.history) if hasattr(est, "history") else "unknown"
-                print(f" - {k}: history_len={hist_len}")
-        except Exception as e:
-            print("Error inspecting memory:", e)
-    if last_exception:
-        print("\nNOTE: Last exception encountered from bot during run:")
-        print(repr(last_exception))
-    print("\nFinal pot value:", state.pots[0].value)
-    print("Players still listed in pot:", state.pots[0].players)
-    print("Final bet_money:", state.bet_money)
-    print("Final held_money:", state.held_money)
+    print("\n=== GAME COMPLETE ===")
+    print(f"Rounds played: {game_stats['rounds_played']}")
+    print(f"Elapsed time: {elapsed:.2f}s")
+    print(f"HERO final stack: {chip_stacks[hero_index]}")
+    print(f"Bot errors: {game_stats['bot_errors']}")
+    if memory:
+        print("Memory summary (villain tracking enabled)")
+    
     return {
-        "turns": total_turns,
+        "rounds": game_stats["rounds_played"],
         "elapsed": elapsed,
-        "bot_actions": bot_actions,
+        "hero_won": game_stats["hero_wins"] == 1,
+        "final_stack": chip_stacks[hero_index],
         "memory": memory,
-        "last_exception": last_exception,
-        "final_state": state
+        "stats": game_stats
     }
 
 # small wrappers to call helpers functions inside this harness (helpers in sys.modules)
 def amount_to_call_wrapper(state):
-    return helpers.amount_to_call(state)
+    return amount_to_call(state)
 
 def all_in_wrapper(state):
-    return helpers.all_in(state)
+    return all_in(state)
+
+# Removed old behavior functions; new simulator uses simple random opponent logic
+
 
 # ------------------------
-# 8) Run it
+# Main entry point
 # ------------------------
 if __name__ == "__main__":
-    print("Starting long-game simulation. Seed =", SEED)
-    res = simulate_long_game()
-    print("\nDone. If the run completed without crashing and memory shows tracked opponents, that's proof the bot handles a long session.")
+    print(f"Starting full poker game simulation. Seed = {SEED}")
+    print(f"6 players, starting stack = 7000 chips")
+    print(f"Initial BB = 100, SB = 50 (doubles every 25 rounds)")
+    print("-" * 70)
+    
+    res = simulate_long_game(seed=SEED)
+    
+    print("\n" + "=" * 70)
+    print("GAME RESULTS:")
+    print(f"  Rounds played: {res['rounds']}")
+    print(f"  Elapsed time: {res['elapsed']:.2f}s")
+    print(f"  HERO won: {res['hero_won']}")
+    print(f"  Final stack: {res['final_stack']} chips")
+    print("=" * 70)

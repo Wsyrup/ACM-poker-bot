@@ -11,7 +11,7 @@ It uses the fast hand_eval module for quick hand comparison.
 """
 
 from itertools import combinations
-from hand_eval import evaluate_hand, evaluate_best_hand
+from .hand_eval import evaluate_hand, evaluate_best_hand
 import random
 
 #simpler function, for more widespread use
