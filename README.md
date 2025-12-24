@@ -1,27 +1,6 @@
-# \[ACM.Dev\] [Mann Vs Machine](https://wiki.teamfortress.com/wiki/Mann_vs._Machine): Poker Bot Starter Code
+# \[ACM.Dev\] [Mann Vs Machine](https://wiki.teamfortress.com/wiki/Mann_vs._Machine): Poker Bot Tournament Submission -- Christian Kantchev
 
-Welcome to the Poker Bot Tournament!
-This repo contains the starter code to build a poker bot for our [poker bot tournament](https://acm-poker-tournament.vercel.app/).
-
-To ensure smooth gameplay and fair evaluation, all teams must follow the submission guidelines outlined below. Any submissions not adhering to these rules may be disqualified.
-
-## Important
-- Please submit your code before **11:59 PM on November 13, 2025**, late submissions will not be accepted.
-- Submission must be made on [your dashboard](https://acm-poker-tournament.vercel.app/dashboard), and all of your code must be in one file.
-- Bots are called only during their own turn; they should not rely on global state or other bots' internals. Keep this in mind when coding up your bot.
-- Illegal moves will be automatically treated as folding. For example, checking when a raise is required or betting less than the required minimum.
-- Your bot will have a runtime limit of 5s each time it's run.
-- Additional helper functions/classes are allowed as long as they don’t interfere with the interface.
-- In your final submission, please ensure that you do NOT include any **print statements** as these interfere with the bot's output.
-
-
-## Submission Rules
-- You should only submit one file.
-- Do not modify the `bet(state: GameState) -> int` function signature or class definitions in the code template.
-- Do not modify the required function signatures or class definitions in the template.
-
-## Input Format
-- Your bot will receive the current game state (using the template schemas provided) and is expected to return a single valid poker action on its turn.
+## Game Summary
 
 Every turn, your poker bot will be invoked through a system call and receive `state` as the input with the `GameState` type. The definition of `GameState` can be found below and inside `bot.py`.
 ```python
@@ -59,11 +38,11 @@ Example `GameState`:
     "big_blind": 10
 }
 ```
+
 Interpreting the example:
 - Betting round after the flop.
 - Player 0 (`team_id0`) bet `20`, Player 1 (`team_id1`) folded, action is on Player 2 (`team_id2`).
 - You have triples with 2 spade (`2s`), 2 hearts (`2h`), and 2 diamonds (`2d`).
-
 
 ## Development Setup
 
@@ -109,39 +88,6 @@ python3.11 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
-
-## Code Specification & Libraries
-- Only Python 3.11 is allowed.
-- We only allow some standard Python libraries and numpy
-- List of black listed standard libraries can be found [here](https://docs.google.com/document/d/1Q78tdVFAZIFt0ZWEgNG65nDDAlbt6rcG5o21waeZprA/edit?usp=sharing).
-
-
-## Testing
-- A local tournament simulator will be provided for participants.
-- We strongly recommend testing your bot locally to ensure it:
-  - Runs without errors
-  - Complies with the template interface
-  - Performs within the time limit
-
-
-## Disqualification Criteria
-- The bot throws errors or crashes during the game.
-- It fails to follow the required interface.
-- It uses illegal libraries or external resources.
-- It exceeds time limits repeatedly.
-- It makes illegal moves (see below).
-
-
-## Additional Things to Note
-- If you have special requests (e.g., library whitelisting, accommodations), contact us through Discord before the submission deadline.
-- All submissions will undergo code reviews to ensure fairness and runtime safety. Non-compliant bots will be disqualified.
-- ACM.Dev reserve the rights to disqualify participants at our discretion.
-
-
-## Contact & Support
-For technical issues or clarifications
-- Join our [Discord server](https://discord.gg/p6rcUUjWaU)
-- Or email us at: [acm.dev.ucsb@gmail.com](mailto:acm.dev.ucsb@gmail.com)
 
 ## Technical specifications & implementation
 
